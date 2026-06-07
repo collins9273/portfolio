@@ -73,12 +73,12 @@ tr:hover td{background:var(--bg);}
 <body>
 <div class="shell">
 <header>
-  <div><h1>Portfolio Manager</h1><div class="sub">Real-time prices via Finnhub &bull; no installation needed</div></div>
+  <div><h1>Portfolio Manager</h1><div class="sub">Real-time prices via Finnhub</div></div>
   <div class="pill"><span class="dot" id="ldot"></span><span id="lstatus">Not connected</span></div>
 </header>
 <div class="setup" id="setup-box">
   <h3 style="margin-bottom:8px">Enter your Finnhub API Key</h3>
-  <p style="font-size:11px;opacity:.8;margin-bottom:8px">Free at <a href="https://finnhub.io/dashboard" target="_blank" style="color:#fff">finnhub.io/dashboard</a> - no credit card needed</p>
+  <p style="font-size:11px;opacity:.8;margin-bottom:8px">Free at <a href="https://finnhub.io/dashboard" target="_blank" style="color:#fff">finnhub.io/dashboard</a></p>
   <input id="key-input" type="password" placeholder="Paste your Finnhub API key here">
   <div style="display:flex;gap:8px;align-items:center">
     <button onclick="saveKey()" style="background:#fff;color:var(--accent);border:none;border-radius:var(--rsm);height:32px;padding:0 16px;font-weight:600;cursor:pointer;font-size:13px;">Connect</button>
@@ -94,7 +94,7 @@ tr:hover td{background:var(--bg);}
 <div class="tabs">
   <button class="tab active" onclick="showTab('holdings')">Holdings</button>
   <button class="tab" onclick="showTab('risk')">Risk</button>
-  <button class="tab" id="tab-alert-btn" onclick="showTab('alerts')">Alerts</button>
+  <button class="tab" id="alert-tab-btn" onclick="showTab('alerts')">Alerts</button>
 </div>
 <div id="tab-holdings">
   <div class="card">
@@ -115,7 +115,7 @@ tr:hover td{background:var(--bg);}
       <div class="tip">Enter ticker (e.g. RDW, AAPL) and buy price in USD. Shown in GBP automatically.</div>
       <div class="field"><label>Ticker</label><input id="ft" placeholder="RDW" style="width:80px" maxlength="10"></div>
       <div class="field"><label>Company</label><input id="fn" placeholder="Redwire Corp" style="width:130px"></div>
-      <div class="field"><label>Shares</label><input id="fq" type="text" inputmode="decimal" placeholder="27.38" style="width:100px"></div>
+      <div class="field"><label>Shares</label><input id="fq" type="text" placeholder="27.38" style="width:100px"></div>
       <div class="field"><label>Buy price ($)</label><input id="fp" type="number" placeholder="21.00" style="width:100px"></div>
       <div class="field"><label>Sector</label>
         <select id="fs" style="width:110px">
@@ -186,7 +186,7 @@ const save=()=>{localStorage.setItem('fh_h',JSON.stringify(holdings));localStora
 function toast(msg,dur=3500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),dur);}
 function setStatus(s,msg){document.getElementById('ldot').className='dot'+(s?' '+s:'');document.getElementById('lstatus').textContent=msg;}
 function saveKey(){const v=document.getElementById('key-input').value.trim();if(!v){toast('Paste your Finnhub key first');return;}KEY=v;save();document.getElementById('setup-box').style.display='none';document.getElementById('rbtn').disabled=false;fetchFX().then(()=>refreshPrices());}
-async function fetchFX(){try{const r=await fetch('https://finnhub.io/api/v1/forex/rates?base=USD&token='+KEY);const d=await r.json();if(d.quote&&d.quote.GBP){usdGbp=d.quote.GBP;localStorage.setItem('fh_fx',usdGbp);}}catch(e){}}
+async function fetchFX(){try{const r=await fetch('https://api.exchangerate-api.com/v4/latest/USD');const d=await r.json();if(d.rates&&d.rates.GBP){usdGbp=d.rates.GBP;localStorage.setItem('fh_fx',usdGbp);}}catch(e){usdGbp=parseFloat(localStorage.getItem('fh_fx'))||FX;}}
 async function refreshPrices(){if(!KEY){toast('Add your Finnhub key first');return;}setStatus('loading','Fetching...');let ok=0,fail=0;for(const h of holdings){try{const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+h.ticker+'&token='+KEY);const d=await r.json();if(d.c&&d.c!==0){quotes[h.ticker]={c:d.c,pc:d.pc,chg:d.d||0,chgP:d.dp||0};ok++;}else fail++;}catch(e){fail++;}await new Promise(r=>setTimeout(r,150));}if(ok>0){setStatus('live',ok+' live \u00b7 '+new Date().toLocaleTimeString('en-GB'));toast(ok+' prices loaded'+(fail?' ('+fail+' failed)':''));}else{setStatus('err','Failed - check your key');toast('Could not load prices.');}render();checkAlerts();save();clearTimeout(rtimer);rtimer=setTimeout(()=>{if(KEY)refreshPrices();},30000);}
 function render(){renderMetrics();renderHoldings();renderAlerts();populateRisk();}
 function renderMetrics(){let cost=0,val=0,day=0;holdings.forEach(h=>{const q=quotes[h.ticker];const cur=q?gbp(q.c):gbp(h.buyPriceUSD);cost+=h.qty*gbp(h.buyPriceUSD);val+=h.qty*cur;if(q)day+=h.qty*gbp(q.chg);});const g=val-cost,gp=cost?g/cost*100:0,dp=val?day/val*100:0;const af=alerts.filter(a=>!a.triggered).length,at=alerts.filter(a=>a.triggered).length;document.getElementById('m-val').textContent='\u00a3'+fmt(val,0);document.getElementById('m-cost').textContent='Cost \u00a3'+fmt(cost,0);const pe=document.getElementById('m-pnl');pe.textContent=fmtG(g);pe.className='val '+(g>=0?'up':'down');document.getElementById('m-pnlp').textContent=fmtP(gp);document.getElementById('m-pnlp').className=g>=0?'up':'down';const de=document.getElementById('m-day');de.textContent=(day>=0?'+ ':'')+'\u00a3'+fmt(Math.abs(day),0);de.className='val '+(day>=0?'up':'down');document.getElementById('m-dayp').textContent=fmtP(dp);document.getElementById('m-dayp').className=day>=0?'up':'down';document.getElementById('m-al').textContent=af;document.getElementById('m-als').textContent=at+' triggered';}
@@ -201,7 +201,7 @@ build('sres',parseFloat(document.getElementById('rsx').value),'sell');build('bre
 function clearRisk(){['rsp','rsx','rbp','rbx'].forEach(id=>document.getElementById(id).value='');['sres','bres'].forEach(id=>document.getElementById(id).innerHTML='<span style="color:var(--text3)">Enter a value above</span>');document.getElementById('rrsum').innerHTML='';}
 function saveAlerts(){const ticker=document.getElementById('rsel').value;const h=holdings.find(h=>h.ticker===ticker);if(!h){toast('Select a holding first');return;}let added=0;const sp=parseFloat(document.getElementById('rsx').value),bp=parseFloat(document.getElementById('rbx').value);const spp=parseFloat(document.getElementById('rsp').value),bpp=parseFloat(document.getElementById('rbp').value);if(!isNaN(sp)&&sp>0){alerts.push({id:nid++,ticker,type:'sell',trigger:sp,desc:'Sell at $'+fmt(sp)+(spp?' (+'+spp.toFixed(1)+'%)':''),triggered:false});added++;}if(!isNaN(bp)&&bp>0){alerts.push({id:nid++,ticker,type:'buy',trigger:bp,desc:'Buy at $'+fmt(bp)+(bpp?' (-'+bpp.toFixed(1)+'%)':''),triggered:false});added++;}if(added){save();toast(added+' alert'+(added>1?'s':'')+' saved');showTab('alerts');}else toast('Enter at least one trigger price');}
 function checkAlerts(){alerts.forEach(a=>{if(a.triggered)return;const q=quotes[a.ticker];if(!q)return;const hit=(a.type==='sell'&&q.c>=a.trigger)||(a.type==='buy'&&q.c<=a.trigger);if(hit){a.triggered=true;toast(a.ticker+': '+a.desc);if(notifOK&&'Notification'in window)new Notification(a.ticker+' Alert',{body:a.desc});}});save();renderAlerts();}
-function renderAlerts(){const el=document.getElementById('alist');const btn=document.getElementById('tab-alert-btn');const fired=alerts.filter(a=>a.triggered).length;btn.textContent='Alerts'+(fired?' ('+fired+')':'');if(!alerts.length){el.innerHTML='<div class="empty">No alerts yet - use the Risk tab to create them.</div>';return;}el.innerHTML=alerts.map(a=>{const q=quotes[a.ticker];const cur=q?q.c:null;const dist=cur?((cur-a.trigger)/a.trigger*100):null;const near=dist!=null&&!a.triggered&&Math.abs(dist)<3;return '<div class="aitem '+(a.triggered?'triggered':near?'near':'')+'"><div><div style="font-weight:600">'+a.ticker+' - '+a.desc+'</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Current: '+(cur?'$'+fmt(cur):'no data')+' | Distance: '+(dist!=null?dist.toFixed(2)+'%':'--')+(a.triggered?' | TRIGGERED':'')+(near?' | Near!':'')+' </div></div><button class="btn danger sm" onclick="removeAlert('+a.id+')">x</button></div>';}).join('');}
+function renderAlerts(){const el=document.getElementById('alist');const btn=document.getElementById('alert-tab-btn');const fired=alerts.filter(a=>a.triggered).length;btn.textContent='Alerts'+(fired?' ('+fired+')':'');if(!alerts.length){el.innerHTML='<div class="empty">No alerts yet - use the Risk tab to create them.</div>';return;}el.innerHTML=alerts.map(a=>{const q=quotes[a.ticker];const cur=q?q.c:null;const dist=cur?((cur-a.trigger)/a.trigger*100):null;const near=dist!=null&&!a.triggered&&Math.abs(dist)<3;return '<div class="aitem '+(a.triggered?'triggered':near?'near':'')+'"><div><div style="font-weight:600">'+a.ticker+' - '+a.desc+'</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Current: '+(cur?'$'+fmt(cur):'no data')+' | Distance: '+(dist!=null?dist.toFixed(2)+'%':'--')+(a.triggered?' | TRIGGERED':'')+(near?' | Near!':'')+' </div></div><button class="btn danger sm" onclick="removeAlert('+a.id+')">x</button></div>';}).join('');}
 function removeAlert(id){alerts=alerts.filter(a=>a.id!==id);save();renderAlerts();}
 function clearTriggered(){alerts=alerts.filter(a=>!a.triggered);save();renderAlerts();}
 function reqNotif(){if(!('Notification'in window)){toast('Not supported');return;}Notification.requestPermission().then(p=>{notifOK=p==='granted';toast(notifOK?'Notifications enabled':'Denied');});}
